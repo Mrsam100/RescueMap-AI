@@ -15,6 +15,7 @@ import './drone-feed.css'
 import './feed-visibility.css'
 import './real-video.css'
 import './video-state.css'
+import './video-performance.css'
 
 const incidents = [
   { id: 'INC-2048', name: 'North Valley Flood', location: 'Kangra, HP', status: 'Active', severity: 'Critical', people: 18, updated: '2 min ago', color: 'coral' },
@@ -102,6 +103,7 @@ function LiveMapPage({ mapZoom, setMapZoom, visibleLayers, setVisibleLayers, sel
 
 function DroneFeed() {
   const canvasRef = useRef(null)
+  const [sourceRequested, setSourceRequested] = useState(false)
   const [videoLoading, setVideoLoading] = useState(true)
   const [videoFailed, setVideoFailed] = useState(false)
   const [videoTimedOut, setVideoTimedOut] = useState(false)
@@ -135,7 +137,7 @@ function DroneFeed() {
     const loadTimer = setTimeout(() => setVideoTimedOut(true), 7000)
     return () => { cancelAnimationFrame(animationFrame); clearInterval(frameTimer); clearTimeout(loadTimer) }
   }, [])
-  return <div className="drone-feed"><div className="drone-feed-head"><span><i /> DRONE-07 · AERIAL FEED</span><span>{frame.toLocaleString()} FR</span></div>{videoFailed || videoTimedOut ? <canvas ref={canvasRef} width="520" height="270" /> : <video className="drone-video" src="/video/drone-flood.mp4" autoPlay loop muted playsInline preload="metadata" controls onLoadedData={() => { setVideoLoading(false); setVideoTimedOut(false) }} onCanPlay={() => { setVideoLoading(false); setVideoTimedOut(false) }} onError={() => { setVideoLoading(false); setVideoFailed(true) }} />}{!videoFailed && !videoTimedOut && <div className="video-overlay"><span><i /> LIVE SOURCE VIDEO</span><strong>NEPAL FLOOD AFTERMATH</strong></div>}{videoLoading && !videoFailed && !videoTimedOut && <div className="video-loading"><span className="loading-spinner" /> Connecting to drone footage...</div>}{(videoFailed || videoTimedOut) && <div className="video-error"><strong>{videoTimedOut ? 'Video is taking too long to load' : 'Source video unavailable'}</strong><span>Showing simulated aerial fallback</span></div>}<div className="drone-feed-meta"><span><Video size={12} /> {videoFailed || videoTimedOut ? 'SIMULATED · 24 FPS' : videoLoading ? 'CONNECTING TO SOURCE' : 'SOURCE MP4 · AUDIO MUTED'}</span><span>ALT 184 m</span><span>09:41:28 IST</span></div></div>
+  return <div className="drone-feed"><div className="drone-feed-head"><span><i /> DRONE-07 · AERIAL FEED</span><span>{frame.toLocaleString()} FR</span></div>{sourceRequested && !videoFailed && !videoTimedOut ? <video className="drone-video" src="/video/drone-flood.mp4" autoPlay loop muted playsInline preload="metadata" controls onLoadedData={() => { setVideoLoading(false); setVideoTimedOut(false) }} onCanPlay={() => { setVideoLoading(false); setVideoTimedOut(false) }} onError={() => { setVideoLoading(false); setVideoFailed(true) }} /> : <canvas ref={canvasRef} width="520" height="270" />}{!sourceRequested && <div className="video-preview"><div><strong>Simulated aerial preview ready</strong><span>Source footage is 19 MB and loads on demand.</span></div><button onClick={() => { setSourceRequested(true); setVideoLoading(true); setVideoTimedOut(false) }}><Video size={14} /> Load source video</button></div>}{sourceRequested && !videoFailed && !videoTimedOut && <div className="video-overlay"><span><i /> LIVE SOURCE VIDEO</span><strong>NEPAL FLOOD AFTERMATH</strong></div>}{sourceRequested && videoLoading && !videoFailed && !videoTimedOut && <div className="video-loading"><span className="loading-spinner" /> Connecting to drone footage...</div>}{(videoFailed || videoTimedOut) && <div className="video-error"><strong>{videoTimedOut ? 'Video is taking too long to load' : 'Source video unavailable'}</strong><span>Showing simulated aerial fallback</span></div>}<div className="drone-feed-meta"><span><Video size={12} /> {!sourceRequested || videoFailed || videoTimedOut ? 'SIMULATED · 24 FPS' : videoLoading ? 'CONNECTING TO SOURCE' : 'SOURCE MP4 · AUDIO MUTED'}</span><span>ALT 184 m</span><span>09:41:28 IST</span></div></div>
 }
 
 function SecondaryPage({ activeNav, incidents, zones, mapZoom, setMapZoom, visibleLayers, setVisibleLayers, selectedMarker, setSelectedMarker, routeMode, setRouteMode }) {
