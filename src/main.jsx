@@ -21,6 +21,9 @@ import './map-movement.css'
 import './incident-command.css'
 import './analytics-command.css'
 import './analytics-fixes.css'
+import './notifications.css'
+import './team-command.css'
+import './team-enhancements.css'
 
 const incidents = [
   { id: 'INC-2048', name: 'North Valley Flood', location: 'Kangra, HP', status: 'Active', severity: 'Critical', people: 18, updated: '2 min ago', color: 'coral' },
@@ -42,6 +45,13 @@ const snapshots = {
   'All time': { incidents: '14', people: '193', routes: '2,418', devices: '12', confidence: '89% confidence score', period: 'all recorded time', processed: '31,204 frames' },
 }
 
+const initialNotifications = [
+  { id: 1, title: 'New survivor signal detected', detail: '18 people near Sector 04', time: '2 min ago', tone: 'critical', unread: true },
+  { id: 2, title: 'Route 03 recalculated', detail: 'Team Alpha has a safer path', time: '8 min ago', tone: 'route', unread: true },
+  { id: 3, title: 'Drone battery below 25%', detail: 'DRONE-07 · 22% remaining', time: '16 min ago', tone: 'warning', unread: true },
+  { id: 4, title: 'Terrain scan complete', detail: '1,428 frames processed', time: '34 min ago', tone: 'success', unread: false },
+]
+
 function App() {
   const [activeNav, setActiveNav] = useState('Overview')
   const [selectedIncident, setSelectedIncident] = useState(incidents[0])
@@ -57,7 +67,13 @@ function App() {
   const [visibleLayers, setVisibleLayers] = useState({ hazards: true, route: true, survivors: true })
   const [selectedMarker, setSelectedMarker] = useState('survivor')
   const [routeMode, setRouteMode] = useState('Safest route')
+  const [notificationsOpen, setNotificationsOpen] = useState(false)
+  const [notifications, setNotifications] = useState(initialNotifications)
   const snapshot = snapshots[timeRange]
+  const unreadCount = notifications.filter((notification) => notification.unread).length
+
+  const markNotificationRead = (id) => setNotifications((items) => items.map((item) => item.id === id ? { ...item, unread: false } : item))
+  const markAllNotificationsRead = () => setNotifications((items) => items.map((item) => ({ ...item, unread: false })))
 
   const navItems = [
     { label: 'Overview', icon: Gauge }, { label: 'Live map', icon: Map },
@@ -82,7 +98,7 @@ function App() {
       </aside>
 
       <main className="main-content">
-        <header className="topbar"><div className="mobile-brand"><Menu size={21} /><span>Rescue<span className="brand-accent">Map</span></span></div><div className="breadcrumb"><span>Mission control</span><span>/</span><strong>{activeNav}</strong></div><div className="top-actions"><div className="global-search"><Search size={17} /><span>Search anything</span><kbd>⌘ K</kbd></div><button className="icon-btn"><CircleHelp size={19} /></button><button className="icon-btn notification"><Bell size={19} /><i /></button><div className="top-avatar">AS</div></div></header>
+        <header className="topbar"><div className="mobile-brand"><Menu size={21} /><span>Rescue<span className="brand-accent">Map</span></span></div><div className="breadcrumb"><span>Mission control</span><span>/</span><strong>{activeNav}</strong></div><div className="top-actions"><div className="global-search"><Search size={17} /><span>Search anything</span><kbd>⌘ K</kbd></div><button className="icon-btn"><CircleHelp size={19} /></button><div className="notification-wrap"><button className={`icon-btn notification ${notificationsOpen ? 'open' : ''}`} onClick={() => setNotificationsOpen(!notificationsOpen)} aria-label="Notifications"><Bell size={19} />{unreadCount > 0 && <i>{unreadCount}</i>}</button>{notificationsOpen && <div className="notification-panel"><div className="notification-head"><div><strong>Notifications</strong><span>{unreadCount ? `${unreadCount} unread alerts` : 'All caught up'}</span></div>{unreadCount > 0 && <button onClick={markAllNotificationsRead}>Mark all read</button>}</div><div className="notification-list">{notifications.map((notification) => <button className={`notification-item ${notification.unread ? 'unread' : ''}`} key={notification.id} onClick={() => markNotificationRead(notification.id)}><span className={`notification-tone ${notification.tone}`}><Bell size={13} /></span><span className="notification-copy"><strong>{notification.title}</strong><span>{notification.detail}</span><small>{notification.time}</small></span>{notification.unread && <b />}</button>)}</div></div>}</div><div className="top-avatar">AS</div></div></header>
         <div className="page-content">
           <div className="page-heading"><div><div className="eyebrow"><span className="pulse" /> SYSTEMS NOMINAL <span className="eyebrow-time">· 09:41 IST</span></div><h1>{activeNav === 'Overview' ? 'Good morning, Arjun' : activeNav}</h1><p>Here is what is happening across your active response operations.</p></div><div className="heading-actions"><div className="range-picker"><button className="button secondary" onClick={() => setTimeOpen(!timeOpen)}><Clock3 size={16} /> {timeRange} <ChevronDown size={15} /></button>{timeOpen && <div className="range-menu">{['Last 6 hours','Last 24 hours','Last 7 days','All time'].map((range) => <button key={range} className={timeRange === range ? 'chosen' : ''} onClick={() => { setTimeRange(range); setTimeOpen(false) }}>{range}{timeRange === range && <CheckCircle2 size={14} />}</button>)}</div>}</div><button className={`button primary ${isScanning ? 'scanning' : ''}`} onClick={scanNow}><Sparkles size={16} /> {isScanning ? 'Scanning terrain...' : scanComplete ? 'Scan complete' : 'Run new scan'}</button></div></div>
           {activeNav === 'Overview' ? <>
@@ -141,11 +157,23 @@ function LiveMapPage({ mapZoom, setMapZoom, visibleLayers, setVisibleLayers, sel
 
 function DroneFeed() {
   const canvasRef = useRef(null)
+  const videoRef = useRef(null)
   const [sourceRequested, setSourceRequested] = useState(true)
   const [videoLoading, setVideoLoading] = useState(true)
   const [videoFailed, setVideoFailed] = useState(false)
   const [videoTimedOut, setVideoTimedOut] = useState(false)
   const [frame, setFrame] = useState(18420)
+  useEffect(() => {
+    const video = videoRef.current
+    const startPlayback = () => video?.play().catch(() => {})
+    startPlayback()
+    video?.addEventListener('loadedmetadata', startPlayback)
+    video?.addEventListener('canplay', startPlayback)
+    return () => {
+      video?.removeEventListener('loadedmetadata', startPlayback)
+      video?.removeEventListener('canplay', startPlayback)
+    }
+  }, [])
   useEffect(() => {
     let animationFrame
     let started = performance.now()
@@ -175,7 +203,7 @@ function DroneFeed() {
     const loadTimer = setTimeout(() => {}, 7000)
     return () => { cancelAnimationFrame(animationFrame); clearInterval(frameTimer); clearTimeout(loadTimer) }
   }, [])
-  return <div className="drone-feed"><div className="drone-feed-head"><span><i /> DRONE-07 · AERIAL FEED</span><span>{frame.toLocaleString()} FR</span></div>{sourceRequested && !videoFailed && !videoTimedOut ? <video className="drone-video" src="/video/drone-flood.mp4" autoPlay loop muted playsInline preload="metadata" controls onLoadedData={() => { setVideoLoading(false); setVideoTimedOut(false) }} onCanPlay={() => { setVideoLoading(false); setVideoTimedOut(false) }} onError={() => { setVideoLoading(false); setVideoFailed(true) }} /> : <canvas ref={canvasRef} width="520" height="270" />}{!sourceRequested && <div className="video-preview"><div><strong>Simulated aerial preview ready</strong><span>Source footage is 19 MB and loads on demand.</span></div><button onClick={() => { setSourceRequested(true); setVideoLoading(true); setVideoTimedOut(false) }}><Video size={14} /> Load source video</button></div>}{sourceRequested && !videoFailed && !videoTimedOut && <div className="video-overlay"><span><i /> LIVE SOURCE VIDEO</span><strong>NEPAL FLOOD AFTERMATH</strong></div>}{sourceRequested && videoLoading && !videoFailed && !videoTimedOut && <div className="video-loading"><span className="loading-spinner" /> Connecting to drone footage...</div>}{(videoFailed || videoTimedOut) && <div className="video-error"><strong>{videoTimedOut ? 'Video is taking too long to load' : 'Source video unavailable'}</strong><span>Showing simulated aerial fallback</span></div>}<div className="drone-feed-meta"><span><Video size={12} /> {!sourceRequested || videoFailed || videoTimedOut ? 'SIMULATED · 24 FPS' : videoLoading ? 'CONNECTING TO SOURCE' : 'SOURCE MP4 · AUDIO MUTED'}</span><span>ALT 184 m</span><span>09:41:28 IST</span></div></div>
+  return <div className="drone-feed"><div className="drone-feed-head"><span><i /> DRONE-07 · AERIAL FEED</span><span>{frame.toLocaleString()} FR</span></div>{sourceRequested && !videoFailed && !videoTimedOut ? <video ref={videoRef} className="drone-video" src="/video/drone-flood.mp4" autoPlay loop muted playsInline preload="auto" controls onLoadedData={() => { setVideoLoading(false); setVideoTimedOut(false) }} onCanPlay={() => { setVideoLoading(false); setVideoTimedOut(false) }} onError={() => { setVideoLoading(false); setVideoFailed(true) }} /> : <canvas ref={canvasRef} width="520" height="270" />}{!sourceRequested && <div className="video-preview"><div><strong>Simulated aerial preview ready</strong><span>Source footage is 19 MB and loads on demand.</span></div><button onClick={() => { setSourceRequested(true); setVideoLoading(true); setVideoTimedOut(false) }}><Video size={14} /> Load source video</button></div>}{sourceRequested && !videoFailed && !videoTimedOut && <div className="video-overlay"><span><i /> LIVE SOURCE VIDEO</span><strong>NEPAL FLOOD AFTERMATH</strong></div>}{sourceRequested && videoLoading && !videoFailed && !videoTimedOut && <div className="video-loading"><span className="loading-spinner" /> Connecting to drone footage...</div>}{(videoFailed || videoTimedOut) && <div className="video-error"><strong>{videoTimedOut ? 'Video is taking too long to load' : 'Source video unavailable'}</strong><span>Showing simulated aerial fallback</span></div>}<div className="drone-feed-meta"><span><Video size={12} /> {!sourceRequested || videoFailed || videoTimedOut ? 'SIMULATED · 24 FPS' : videoLoading ? 'CONNECTING TO SOURCE' : 'SOURCE MP4 · AUDIO MUTED'}</span><span>ALT 184 m</span><span>09:41:28 IST</span></div></div>
 }
 
 function SecondaryPage({ activeNav, incidents, zones, mapZoom, setMapZoom, visibleLayers, setVisibleLayers, selectedMarker, setSelectedMarker, routeMode, setRouteMode }) {
@@ -183,6 +211,7 @@ function SecondaryPage({ activeNav, incidents, zones, mapZoom, setMapZoom, visib
   const descriptions = { 'Live map': 'A synchronized view of routes, hazards, and responder positions.', Incidents: 'Review every active operation and its latest intelligence.', Analytics: 'Measure detection quality, route performance, and response time.', 'Video feeds': 'Monitor connected drone and rover feeds at the edge.', Reports: 'Exportable summaries from your simulated mission archive.', Team: 'Coordinate field units and confirm their readiness.', Settings: 'Configure the local mission workspace and analysis layers.' }
   if (activeNav === 'Incidents') return <IncidentCommandPage incidents={incidents} />
   if (activeNav === 'Analytics') return <AnalyticsCommandPage />
+  if (activeNav === 'Team') return <ResponseTeamPage />
   return activeNav === 'Live map' ? <LiveMapPage mapZoom={mapZoom} setMapZoom={setMapZoom} visibleLayers={visibleLayers} setVisibleLayers={setVisibleLayers} selectedMarker={selectedMarker} setSelectedMarker={setSelectedMarker} routeMode={routeMode} setRouteMode={setRouteMode} /> : activeNav === 'Video feeds' ? <div className="video-page"><div className="subpage-intro"><div><span className="panel-kicker">Workspace / Video feeds</span><h2>Camera feed monitor</h2><p>All simulated aerial feeds currently available to the response team.</p></div><span className="map-live-status"><span className="live-dot" /> 1 FEED ONLINE</span></div><div className="video-page-grid"><DroneFeed /><div className="panel video-status"><div className="panel-head"><div><span className="panel-kicker">Feed diagnostics</span><h3>DRONE-07 status</h3></div><CheckCircle2 color="var(--green)" size={17} /></div><div className="video-stat"><span>Signal strength</span><strong>Excellent</strong></div><div className="video-stat"><span>Stream latency</span><strong>42 ms</strong></div><div className="video-stat"><span>Storage buffer</span><strong>18 min</strong></div><button className="button primary"><Video size={15} /> Enter full screen</button></div></div></div> : <div className="subpage"><div className="subpage-intro"><div><span className="panel-kicker">Mission workspace</span><h2>{titles[activeNav]}</h2><p>{descriptions[activeNav]}</p></div><button className="button primary"><Sparkles size={16} /> Generate insight</button></div><div className="subpage-grid"><div className="panel subpage-main"><div className="panel-head"><div><span className="panel-kicker">Simulated live data</span><h3>Latest workspace activity</h3></div><span className="confidence"><CheckCircle2 size={14} /> Synced</span></div><div className="subpage-list">{(activeNav === 'Incidents' ? incidents : zones).map((item, index) => <div className="subpage-row" key={item.id || item.label}><div className={`subpage-number ${index === 0 ? 'hot' : ''}`}>{String(index + 1).padStart(2, '0')}</div><div><strong>{item.name || item.label}</strong><span>{item.location || `${item.count} detected signals · Updated moments ago`}</span></div><span className="subpage-value">{item.people || item.count || `${92 - index * 8}%`}<small>{item.people ? 'at risk' : 'confidence'}</small></span><ArrowUpRight size={15} /></div>)}</div></div><div className="panel insight-panel"><div className="panel-head"><div><span className="panel-kicker">AI recommendation</span><h3>Next best action</h3></div><Sparkles size={17} className="spark" /></div><div className="insight-body"><div className="insight-icon"><Route size={21} /></div><strong>Deploy Team Alpha via Route 03</strong><p>Current route avoids two unstable terrain cells and reduces estimated travel time by 11 minutes.</p><button className="text-button">Review recommendation <ArrowUpRight size={15} /></button></div></div></div></div>
 }
 
@@ -195,6 +224,22 @@ function AnalyticsCommandPage() {
 }
 
 function TrendingUpIcon() { return <ArrowUpRight size={15} /> }
+
+function ResponseTeamPage() {
+  const [filter, setFilter] = useState('All units')
+  const [dispatched, setDispatched] = useState(false)
+  const [selectedUnit, setSelectedUnit] = useState('A-04')
+  const [commsOpen, setCommsOpen] = useState(false)
+  const units = [
+    { id: 'A-04', name: 'Team Alpha', role: 'Rapid response unit', status: 'Deployed', location: 'Sector 04 · North Valley', battery: 87, color: 'orange', skills: ['Medical', 'Rope rescue'], task: 'Route 03 · Survivor cluster' },
+    { id: 'B-02', name: 'Team Bravo', role: 'Search & assessment', status: 'Standby', location: 'Command post · East Ridge', battery: 94, color: 'blue', skills: ['Search', 'Terrain scan'], task: 'Awaiting assignment' },
+    { id: 'C-11', name: 'Medical Unit 11', role: 'Emergency medical support', status: 'Ready', location: 'Staging area · North Valley', battery: 76, color: 'green', skills: ['Trauma care', 'Evacuation'], task: 'Available for dispatch' },
+    { id: 'D-07', name: 'Drone Operations', role: 'Aerial intelligence', status: 'Active', location: 'Above Sector 04 · 184 m', battery: 22, color: 'yellow', skills: ['Aerial feed', 'Live scan'], task: 'Mapping flood boundary' },
+  ]
+  const visibleUnits = filter === 'All units' ? units : units.filter((unit) => unit.status === filter)
+  const selected = units.find((unit) => unit.id === selectedUnit) || units[0]
+  return <div className="team-command"><div className="team-head"><div><div className="eyebrow"><span className="pulse" /> FIELD OPERATIONS <span className="eyebrow-time">· 4 UNITS ONLINE</span></div><h2>Response team</h2><p>Know who is ready, who is moving, and where help is needed next.</p></div><div className="team-actions"><button className="button secondary" onClick={() => setCommsOpen(!commsOpen)}><Radio size={15} /> {commsOpen ? 'Close comms' : 'Open comms'}</button><button className="button primary" onClick={() => setDispatched(!dispatched)}><Navigation size={15} /> {dispatched ? 'Dispatch queued' : 'Dispatch unit'}</button></div></div>{commsOpen && <div className="comms-strip"><span className="comms-live"><i /> CHANNEL 04 LIVE</span><strong>“North Valley route is clear. Alpha approaching survivor cluster.”</strong><span>Team Alpha · 09:42:16</span></div>}<div className="team-health"><div className="team-health-lead"><div className="readiness-orbit"><Users size={23} /></div><div><span className="panel-kicker">Overall readiness</span><strong>86%</strong><p>Teams can respond now</p></div></div><div className="health-stat"><span>Deployed</span><strong>01</strong><i className="orange-line" /></div><div className="health-stat"><span>Ready</span><strong>02</strong><i className="green-line" /></div><div className="health-stat"><span>Standby</span><strong>01</strong><i className="blue-line" /></div><div className="health-stat"><span>Needs attention</span><strong>01</strong><i className="yellow-line" /></div></div><div className="team-layout"><div className="team-roster panel"><div className="team-roster-head"><div><span className="panel-kicker">Live roster</span><h3>Field units</h3></div><span className="map-live-status"><span className="live-dot" /> SYNCED</span></div><div className="team-filters">{['All units','Deployed','Ready','Standby'].map((item) => <button className={filter === item ? 'active' : ''} onClick={() => setFilter(item)} key={item}>{item}</button>)}</div><div className="unit-list">{visibleUnits.map((unit) => <button className={`unit-card ${selectedUnit === unit.id ? 'selected' : ''}`} key={unit.id} onClick={() => setSelectedUnit(unit.id)}><div className={`unit-avatar ${unit.color}`}>{unit.id.slice(0,1)}</div><div className="unit-copy"><div className="unit-title"><strong>{unit.name}</strong><span className={`unit-status ${unit.status.toLowerCase()}`}><i /> {unit.status}</span></div><span>{unit.role}</span><small><Map size={11} /> {unit.location}</small><div className="skill-tags">{unit.skills.map((skill) => <em key={skill}>{skill}</em>)}</div></div><div className="unit-health"><span>Battery</span><strong className={unit.battery < 30 ? 'low' : ''}>{unit.battery}%</strong><div><i style={{width:`${unit.battery}%`}} /></div><small>{unit.task}</small></div><span className="unit-more"><MoreHorizontal size={17} /></span></button>)}</div></div><aside className="team-side"><div className="team-card panel"><div className="panel-head"><div><span className="panel-kicker">Selected assignment</span><h3>{selected.name} · {selected.id}</h3></div><span className={`route-live ${selected.status.toLowerCase()}`}>{selected.status.toUpperCase()}</span></div><div className="assignment-map"><div className="assignment-grid" /><div className="assignment-line" /><span className="assignment-start">HQ</span><span className="assignment-team">{selected.id.slice(0,1)}</span><span className="assignment-target"><Users size={13} /></span></div><div className="assignment-stats"><span><strong>{selected.status === 'Deployed' ? '72%' : '--'}</strong> complete</span><span><strong>{selected.status === 'Deployed' ? '11 min' : 'Ready'}</strong> ETA</span><span><strong>{selected.battery}%</strong> battery</span></div><button className="team-card-action"><Map size={14} /> Track on live map <ArrowUpRight size={14} /></button></div><div className="team-card panel checklist"><div className="panel-head"><div><span className="panel-kicker">Readiness checklist</span><h3>Before next dispatch</h3></div><CheckCircle2 color="var(--green)" size={17} /></div>{[['Radio network','All channels clear',true],['Medical kits','4 kits verified',true],['Drone battery','Replace after mission',false]].map(([label,value,ok]) => <div className="check-row" key={label}><span className={ok ? 'check-ok' : 'check-warn'}>{ok ? <CheckCircle2 size={14} /> : <AlertTriangle size={14} />}</span><div><strong>{label}</strong><small>{value}</small></div></div>)}</div></aside></div></div>
+}
 
 function IncidentCommandPage({ incidents }) {
   const [selected, setSelected] = useState(incidents[0])
