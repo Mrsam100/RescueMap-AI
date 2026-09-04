@@ -24,6 +24,7 @@ import './analytics-fixes.css'
 import './notifications.css'
 import './team-command.css'
 import './team-enhancements.css'
+import './map-blink.css'
 
 const incidents = [
   { id: 'INC-2048', name: 'North Valley Flood', location: 'Kangra, HP', status: 'Active', severity: 'Critical', people: 18, updated: '2 min ago', color: 'coral' },
