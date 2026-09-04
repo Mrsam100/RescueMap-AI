@@ -1,0 +1,1 @@
+.expanded-canvas{cursor:grab;touch-action:none;user-select:none}.expanded-canvas.is-panning{cursor:grabbing}.expanded-stage{transform:translate(var(--map-x,0px),var(--map-y,0px)) scale(var(--map-scale));will-change:transform}.expanded-stage .map-marker,.expanded-stage .unit{user-select:none}
